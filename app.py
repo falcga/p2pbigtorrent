@@ -74,6 +74,15 @@ def create_app():
         files = File.query.all()
         return render_template('index.html', files=files)
 
+    # проверка работоспособности БД
+    @app.route('/health')
+    def health_check():
+        try:
+            db.session.execute('SELECT 1')
+            return {'status': 'healthy', 'database': 'connected'}, 200
+        except Exception as e:
+            return {'status': 'unhealthy', 'error': str(e)}, 500
+            
     # админка - отображение
     @app.route('/admin')
     @login_required
