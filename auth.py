@@ -30,6 +30,8 @@ def login():
 def register():
     if request.method == 'POST':
         email = request.form.get('email')
+        if not email or '@' not in email:
+            flash('error: wrong input')
         password = request.form.get('password')
 
         if User.query.filter_by(email=email).first():
