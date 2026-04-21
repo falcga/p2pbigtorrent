@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Панель администратора</h2>
+<h4>Загрузить новый файл</h4>
+<form method="POST" enctype="multipart/form-data" action="{{ url_for('upload_file') }}">
+    <div class="mb-3">
+        <input type="file" class="form-control" name="file" required>
+    </div>
+    <button type="submit" class="btn btn-success">Загрузить</button>
+</form>
+
+<hr>
+<h4>Список файлов</h4>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Имя</th>
+            <th>Размер (MB)</th>
+            <th>Кусков</th>
+            <th>Действия</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for file in files %}
+        <tr>
+            <td>{{ file.filename }}</td>
+            <td>{{ file.get_size_mb() }}</td>
+            <td>{{ file.get_piece_count() }}</td>
+            <td>
+                <a href="#" class="btn btn-sm btn-danger">Удалить</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

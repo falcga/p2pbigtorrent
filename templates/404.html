@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>404 - Страница не найдена</h1>
+<p>Запрошенный URL не существует.</p>
+<a href="{{ url_for('index') }}" class="btn btn-primary">На главную</a>
+{% endblock %}
