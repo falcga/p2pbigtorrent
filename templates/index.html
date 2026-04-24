@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Доступные файлы</h2>
-<table class="table">
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Доступные файлы</h2>
+</div>
+<table class="table table-hover align-middle">
     <thead>
         <tr>
             <th>Имя файла</th>
@@ -12,20 +14,22 @@
     <tbody>
         {% for file in files %}
         <tr id="file-row-{{ file.id }}">
-            <td>{{ file.filename }}</td>
+            <td>{{ file.display_name or file.filename }}</td>
             <td>{{ (file.file_size / (1024*1024))|round(2) }} MB</td>
             <td>
                 <button class="btn btn-primary download-btn" data-file-id="{{ file.id }}"
-                        data-filename="{{ file.filename }}"
-                        data-piece-count="{{ file.piece_hashes|length }}"
+                        data-filename="{{ file.display_name or file.filename }}"
+                        data-piece-count="{{ file.get_piece_count() }}"
                         data-piece-length="{{ file.piece_length }}"
                         data-file-size="{{ file.file_size }}"
-                        data-piece-hashes='{{ file.piece_hashes|tojson }}'>
+                        data-content-hash="{{ file.content_hash or '' }}"
+                        data-piece-hashes='{{ file.get_piece_hashes_list()|tojson }}'>
                     Скачать
                 </button>
                 <div class="progress mt-2" style="display:none; height: 20px;">
                     <div class="progress-bar" role="progressbar" style="width: 0%;">0%</div>
                 </div>
+                <div class="small mt-2 checksum-status text-muted"></div>
                 <a class="btn btn-sm btn-success download-link" style="display:none;">Сохранить файл</a>
             </td>
         </tr>
@@ -36,60 +40,5 @@
 <script src="{{ url_for('static', filename='js/webrtc_peer.js') }}"></script>
 <script src="{{ url_for('static', filename='js/file_downloader.js') }}"></script>
 <script src="{{ url_for('static', filename='js/webtorrent_client.js') }}"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const client = window.p2pClient;
-
-        document.querySelectorAll('.download-btn').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                const fileId = parseInt(this.dataset.fileId);
-                const filename = this.dataset.filename;
-                const pieceCount = parseInt(this.dataset.pieceCount);
-                const pieceLength = parseInt(this.dataset.pieceLength);
-                const fileSize = parseInt(this.dataset.fileSize);
-                const pieceHashes = JSON.parse(this.dataset.pieceHashes);
-
-                const fileInfo = {
-                    id: fileId,
-                    filename: filename,
-                    piece_count: pieceCount,
-                    piece_length: pieceLength,
-                    file_size: fileSize,
-                    piece_hashes: pieceHashes
-                };
-
-                // UI элементы
-                const row = document.getElementById(`file-row-${fileId}`);
-                const progressDiv = row.querySelector('.progress');
-                const progressBar = progressDiv.querySelector('.progress-bar');
-                const downloadLink = row.querySelector('.download-link');
-                const downloadBtn = this;
-
-                downloadBtn.disabled = true;
-                progressDiv.style.display = 'block';
-
-                const downloader = client.startDownload(fileInfo, {
-                    onProgress: (percent, downloaded, total) => {
-                        progressBar.style.width = percent + '%';
-                        progressBar.textContent = `${Math.round(percent)}% (${downloaded}/${total})`;
-                    },
-                    onComplete: (blob) => {
-                        progressBar.textContent = '100% - Готово!';
-                        downloadLink.style.display = 'inline-block';
-                        downloadLink.href = URL.createObjectURL(blob);
-                        downloadLink.download = filename;
-                        downloadLink.textContent = 'Сохранить';
-                        downloadBtn.disabled = false;
-                    },
-                    onPeerConnected: (peerId) => {
-                        console.log('Peer connected:', peerId);
-                    },
-                    onPeerDisconnected: (peerId) => {
-                        console.log('Peer disconnected:', peerId);
-                    }
-                });
-            });
-        });
-    });
-</script>
+<script src="{{ url_for('static', filename='js/index_page.js') }}"></script>
 {% endblock %}

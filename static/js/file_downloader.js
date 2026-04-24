@@ -14,6 +14,7 @@ class FileDownloader {
         this.downloadedPieces = 0;
         this.isComplete = false;
         this.fileBlob = null;
+        this.finalHashHex = null;
 
         // Очередь запросов
         this.pieceQueue = [];
@@ -38,7 +39,17 @@ class FileDownloader {
     // Запуск загрузки: запрос к трекеру и установка соединений
     async start() {
         this.stats.startTime = Date.now();
-        await this._announceAndConnect();
+        const announce = await this._announceAndConnect();
+        if (this.peers.size === 0 || announce.server_available) {
+            await this._downloadFromServer();
+            return;
+        }
+        setTimeout(() => {
+            const openPeers = Array.from(this.peers.values()).filter(p => p.isOpen).length;
+            if (!this.isComplete && openPeers === 0) {
+                this._downloadFromServer();
+            }
+        }, 3500);
         this._requestNextPieces();
     }
 
@@ -84,6 +95,7 @@ class FileDownloader {
         // Также подписываемся на входящие сигнальные сообщения (WebSocket или polling)
         // Для простоты используем периодический опрос /api/signaling?peer_id=...
         this._startSignalingPolling();
+        return data;
     }
 
     // Отправка сигнального сообщения через трекер
@@ -119,7 +131,6 @@ class FileDownloader {
 
     async _handleSignaling(fromPeerId, data) {
         const peer = this.peers.get(fromPeerId);
-        if (!peer) return; // возможно новый входящий
 
         if (data.type === 'offer') {
             const newPeer = new WebRTCPeer(
@@ -143,8 +154,10 @@ class FileDownloader {
                 answer: answer
             });
         } else if (data.type === 'answer') {
+            if (!peer) return;
             await peer.handleAnswer(data.answer);
         } else if (data.type === 'candidate') {
+            if (!peer) return;
             await peer.addIceCandidate(data.candidate);
         }
     }
@@ -173,6 +186,14 @@ class FileDownloader {
                 const msg = JSON.parse(data);
                 if (msg.type === 'have') {
                     // Пиры могут сообщать о наличии кусков (пока не реализовано)
+                } else if (msg.type === 'request') {
+                    const response = this.servePiece(msg);
+                    if (response) {
+                        const peer = this.peers.get(peerId);
+                        if (peer) {
+                            peer.send(JSON.stringify(response));
+                        }
+                    }
                 } else if (msg.type === 'piece') {
                     this._receivePiece(msg.index, msg.data);
                 }
@@ -264,11 +285,12 @@ class FileDownloader {
         return hashHex === expectedHashHex;
     }
 
-    _finalizeDownload() {
+    async _finalizeDownload() {
         // Собираем файл из кусков
         const blobs = this.pieceMap.map(buf => new Blob([buf]));
         this.fileBlob = new Blob(blobs, { type: 'application/octet-stream' });
         this.isComplete = true;
+        this.finalHashHex = await this._computeBlobSha256(this.fileBlob);
 
         // Сообщаем трекеру, что мы стали сидом
         this._becomeSeeder();
@@ -276,6 +298,13 @@ class FileDownloader {
         if (this.onComplete) {
             this.onComplete(this.fileBlob);
         }
+    }
+
+    async _computeBlobSha256(blob) {
+        const buffer = await blob.arrayBuffer();
+        const digest = await crypto.subtle.digest('SHA-256', buffer);
+        const arr = Array.from(new Uint8Array(digest));
+        return arr.map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
     async _becomeSeeder() {
@@ -307,6 +336,26 @@ class FileDownloader {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+    async _downloadFromServer() {
+        while (this.pieceQueue.length > 0 && !this.isComplete) {
+            const pieceIndex = this.pieceQueue.shift();
+            try {
+                const resp = await fetch(
+                    `${this.trackerUrl}/api/piece?file_id=${this.fileInfo.id}&piece_index=${pieceIndex}`
+                );
+                if (!resp.ok) {
+                    this.pieceQueue.push(pieceIndex);
+                    continue;
+                }
+                const payload = await resp.json();
+                this._receivePiece(payload.index, payload.data);
+            } catch (e) {
+                this.pieceQueue.push(pieceIndex);
+                break;
+            }
         }
     }
 

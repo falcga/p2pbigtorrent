@@ -12,6 +12,13 @@ import json
 # здесь только определение моделей
 
 
+user_groups = db.Table(
+    'user_groups',
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
+    db.Column('group_id', db.Integer, db.ForeignKey('groups.id'), primary_key=True),
+)
+
+
 class User(UserMixin, db.Model):
     """пользователи системы"""
     __tablename__ = 'users'
@@ -20,11 +27,13 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     role = db.Column(db.String(20), default='user')  # admin или user
+    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # связи с другими таблицами
     files = db.relationship('File', backref='uploader', lazy=True)
     peers = db.relationship('Peer', backref='user', lazy=True)
+    groups = db.relationship('Group', secondary=user_groups, back_populates='users', lazy='select')
 
     def __repr__(self):
         return f'<User {self.email} ({self.role})>'
@@ -42,12 +51,14 @@ class File(db.Model):
     file_size = db.Column(db.Integer, nullable=False)  # байты
     piece_length = db.Column(db.Integer, nullable=False)  # размер куска байты
     piece_hashes = db.Column(db.Text, nullable=False)  # json список хешей
+    content_hash = db.Column(db.String(64), nullable=True)
     uploader_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # связи
     peers = db.relationship('Peer', backref='file', lazy=True, cascade='all, delete-orphan')
     pieces = db.relationship('Piece', backref='file', lazy=True, cascade='all, delete-orphan')
+    visibilities = db.relationship('FileVisibility', backref='file', lazy=True, cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<File {self.filename} ({self.file_size} bytes)>'
@@ -138,6 +149,42 @@ class SignalingMessage(db.Model):
         """пометить как доставленное"""
         self.delivered = True
         db.session.commit()
+
+
+class Group(db.Model):
+    """группы пользователей"""
+    __tablename__ = 'groups'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    users = db.relationship('User', secondary=user_groups, back_populates='groups', lazy='select')
+    visibilities = db.relationship('FileVisibility', backref='group', lazy=True, cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<Group {self.name}>'
+
+
+class FileVisibility(db.Model):
+    """
+    Отображение файла для конкретной группы.
+    group_id = NULL => файл общий для всех.
+    """
+    __tablename__ = 'file_visibilities'
+
+    id = db.Column(db.Integer, primary_key=True)
+    file_id = db.Column(db.Integer, db.ForeignKey('files.id'), nullable=False)
+    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=True)
+    display_name = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('file_id', 'group_id', name='unique_file_group_visibility'),
+    )
+
+    def __repr__(self):
+        return f'<FileVisibility file={self.file_id} group={self.group_id} name={self.display_name}>'
 
 
 # вспомогательные функции для работы с бд

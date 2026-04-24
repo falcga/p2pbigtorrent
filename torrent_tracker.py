@@ -1,6 +1,9 @@
+import base64
 from flask import Blueprint, request, jsonify
+from flask_login import login_required, current_user
 from extensions import db
-from models import Peer, Piece
+from models import Peer, Piece, FileVisibility
+from file_manager import get_piece_data
 
 tracker_bp = Blueprint('tracker', __name__)
 
@@ -9,23 +12,47 @@ tracker_bp = Blueprint('tracker', __name__)
 signaling_queue = {}
 
 
+def _can_access_file(file_id):
+    if current_user.role == 'admin':
+        return True
+    user_group_ids = [group.id for group in getattr(current_user, 'groups', [])]
+    return FileVisibility.query.filter(
+        FileVisibility.file_id == file_id,
+        ((FileVisibility.group_id.is_(None)) | (FileVisibility.group_id.in_(user_group_ids)))
+    ).first() is not None
+
+
 @tracker_bp.route('/api/announce')
+@login_required
 def announce():
-    file_id = request.args.get('file_id')
+    file_id = request.args.get('file_id', type=int)
     peer_id = request.args.get('peer_id')
+    if file_id is None or not peer_id:
+        return jsonify({'error': 'file_id и peer_id обязательны'}), 400
+    if not _can_access_file(file_id):
+        return jsonify({'error': 'доступ запрещен'}), 403
+
+    access_row = FileVisibility.query.filter(
+        FileVisibility.file_id == file_id
+    ).first()
+    if not access_row:
+        return jsonify({'error': 'file not found'}), 404
 
     # все пиры для файла кроме себя
     peers = Peer.query.filter(
         Peer.file_id == file_id,
-        Peer.peer_id != peer_id
+        Peer.peer_id != peer_id,
+        Peer.peer_id != 'server'
     ).all()
 
     return jsonify({
-        'peers': [{'peer_id': p.peer_id} for p in peers]
+        'peers': [{'peer_id': p.peer_id} for p in peers],
+        'server_available': True
     })
 
 
 @tracker_bp.route('/api/signaling', methods=['POST'])
+@login_required
 def post_signaling():
     data = request.json
     to_peer = data.get('to_peer')
@@ -42,6 +69,7 @@ def post_signaling():
 
 
 @tracker_bp.route('/api/signaling', methods=['GET'])
+@login_required
 def get_signaling():
     peer_id = request.args.get('peer_id')
 
@@ -52,6 +80,7 @@ def get_signaling():
 
 
 @tracker_bp.route('/api/peer_update', methods=['POST'])
+@login_required
 def peer_update():
     data = request.json
     peer = Peer.query.filter_by(
@@ -74,6 +103,7 @@ def peer_update():
 
 
 @tracker_bp.route('/api/piece_update', methods=['POST'])
+@login_required
 def piece_update():
     data = request.json
     peer = Peer.query.filter_by(
@@ -102,3 +132,22 @@ def piece_update():
         db.session.commit()
 
     return jsonify({'status': 'ok'})
+
+
+@tracker_bp.route('/api/piece', methods=['GET'])
+@login_required
+def piece_data():
+    file_id = request.args.get('file_id', type=int)
+    piece_index = request.args.get('piece_index', type=int)
+
+    if file_id is None or piece_index is None:
+        return jsonify({'error': 'file_id и piece_index обязательны'}), 400
+    if not _can_access_file(file_id):
+        return jsonify({'error': 'доступ запрещен'}), 403
+
+    piece = get_piece_data(file_id, piece_index)
+    if piece is None:
+        return jsonify({'error': 'кусок не найден'}), 404
+
+    encoded = base64.b64encode(piece).decode('ascii')
+    return jsonify({'index': piece_index, 'data': encoded})

@@ -30,9 +30,10 @@ def login():
 def register():
     if request.method == 'POST':
         email = request.form.get('email')
-        if not email or '@' not in email:
-            flash('error: wrong input')
         password = request.form.get('password')
+        if not email or '@' not in email or not password or len(password) < 6:
+            flash('проверьте email и пароль (минимум 6 символов)')
+            return render_template('register.html')
 
         if User.query.filter_by(email=email).first():
             flash('такой email уже есть')

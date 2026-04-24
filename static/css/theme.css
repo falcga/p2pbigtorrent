@@ -1,0 +1,80 @@
+:root {
+    --gh-bg: #ffffff;
+    --gh-card: #f6f8fa;
+    --gh-text: #1f2328;
+    --gh-muted: #59636e;
+    --gh-border: #d1d9e0;
+    --gh-primary: #0969da;
+    --gh-success: #1a7f37;
+}
+
+body[data-theme="dark"] {
+    --gh-bg: #0d1117;
+    --gh-card: #161b22;
+    --gh-text: #e6edf3;
+    --gh-muted: #8b949e;
+    --gh-border: #30363d;
+    --gh-primary: #2f81f7;
+    --gh-success: #3fb950;
+}
+
+body {
+    background-color: var(--gh-bg);
+    color: var(--gh-text);
+}
+
+.nav-shell {
+    border-bottom: 1px solid var(--gh-border);
+    background: var(--gh-card);
+}
+
+.nav-link,
+.navbar-text,
+.navbar-brand {
+    color: var(--gh-text) !important;
+}
+
+.card,
+.table {
+    background-color: var(--gh-card);
+    color: var(--gh-text);
+    border-color: var(--gh-border);
+}
+
+.table {
+    border: 1px solid var(--gh-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table th,
+.table td {
+    border-color: var(--gh-border);
+}
+
+.btn-primary {
+    background-color: var(--gh-primary);
+    border-color: var(--gh-primary);
+}
+
+.btn-success {
+    background-color: var(--gh-success);
+    border-color: var(--gh-success);
+}
+
+.form-control {
+    background-color: var(--gh-bg);
+    color: var(--gh-text);
+    border-color: var(--gh-border);
+}
+
+.form-control:focus {
+    background-color: var(--gh-bg);
+    color: var(--gh-text);
+}
+
+.alert-info {
+    background-color: rgba(9, 105, 218, 0.12);
+    border-color: var(--gh-border);
+    color: var(--gh-text);
+}
