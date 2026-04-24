@@ -1,90 +1,140 @@
 {% extends "base.html" %}
 {% block content %}
 <h2 class="mb-4">Панель администратора</h2>
-<div class="card p-3 mb-4">
-    <h4>Загрузить новый файл</h4>
-    <form method="POST" enctype="multipart/form-data" action="{{ url_for('upload_file') }}">
-        <div class="mb-3">
-            <label class="form-label">Отображаемое имя</label>
-            <input type="text" class="form-control" name="display_name" placeholder="Как файл увидят пользователи">
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Группа доступа</label>
-            <select class="form-select" name="group_id">
-                <option value="">Общий файл (всем)</option>
-                {% for group in groups %}
-                <option value="{{ group.id }}">{{ group.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="mb-3">
-            <input type="file" class="form-control" name="file" required>
-        </div>
-        <button type="submit" class="btn btn-success">Загрузить</button>
-    </form>
-</div>
-
-<hr>
-<div class="row g-4">
-    <div class="col-lg-6">
-        <div class="card p-3">
-            <h4>Группы</h4>
-            <form method="POST" action="{{ url_for('create_group') }}" class="d-flex gap-2 mb-3">
-                <input type="text" class="form-control" name="name" placeholder="Новая группа" required>
-                <button type="submit" class="btn btn-primary">Создать</button>
+<ul class="nav nav-tabs mb-3" id="adminTabs" role="tablist">
+    <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-files" type="button">Файлы</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-users" type="button">Группы и пользователи</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-moderation" type="button">Модерация</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-legal" type="button">Legal</button></li>
+</ul>
+<div class="tab-content">
+    <div class="tab-pane fade show active" id="tab-files">
+        <div class="card p-3 mb-4">
+            <h4>Загрузить новый файл</h4>
+            <form method="POST" enctype="multipart/form-data" action="{{ url_for('upload_file') }}">
+                <div class="mb-3"><label class="form-label">Отображаемое имя</label><input type="text" class="form-control" name="display_name"></div>
+                <div class="mb-3"><label class="form-label">Группа доступа</label><select class="form-select" name="group_id"><option value="">Общий файл (всем)</option>{% for group in groups %}<option value="{{ group.id }}">{{ group.name }}</option>{% endfor %}</select></div>
+                <div class="mb-3"><input type="file" class="form-control" name="file" required></div>
+                <button type="submit" class="btn btn-success">Загрузить</button>
             </form>
-            <ul class="mb-0">
-                {% for group in groups %}
-                <li>{{ group.name }}</li>
-                {% else %}
-                <li>Групп пока нет</li>
-                {% endfor %}
-            </ul>
         </div>
-    </div>
-    <div class="col-lg-6">
-        <div class="card p-3">
-            <h4>Пользователи и группы</h4>
-            {% for user in users %}
-            <form method="POST" action="{{ url_for('set_user_group', user_id=user.id) }}" class="d-flex gap-2 mb-2">
-                <input class="form-control" value="{{ user.email }}" readonly>
-                <select class="form-select" name="group_ids" multiple>
-                    {% for group in groups %}
-                    <option value="{{ group.id }}" {% if group in user.groups %}selected{% endif %}>{{ group.name }}</option>
-                    {% endfor %}
-                </select>
-                <button class="btn btn-outline-primary" type="submit">OK</button>
-            </form>
+        <h4>Список файлов</h4>
+        <table class="table table-hover align-middle">
+            <thead><tr><th>Системное имя</th><th>Размер (MB)</th><th>Кусков</th><th>SHA-256</th><th>Действия</th></tr></thead>
+            <tbody>
+            {% for file in files %}
+                <tr>
+                    <td>{{ file.filename }}</td><td>{{ file.get_size_mb() }}</td><td>{{ file.get_piece_count() }}</td><td><code>{{ file.content_hash or '-' }}</code></td>
+                    <td><form method="POST" action="{{ url_for('delete_file_admin', file_id=file.id) }}" onsubmit="return confirm('Удалить файл?');"><button type="submit" class="btn btn-sm btn-danger">Удалить</button></form></td>
+                </tr>
             {% endfor %}
+            </tbody>
+        </table>
+        <h4 class="mt-4">Переименование и метки групп</h4>
+        <table class="table table-hover align-middle">
+            <thead><tr><th>Файл ID</th><th>Текущая метка</th><th>Группа</th><th>Переименовать</th></tr></thead>
+            <tbody>
+            {% for visibility in visibilities %}
+                <tr>
+                    <td>{{ visibility.file_id }}</td><td>{{ visibility.display_name }}</td><td><span class="text-secondary">{{ visibility.group.name if visibility.group else 'Общий' }}</span></td>
+                    <td><form method="POST" action="{{ url_for('rename_visibility', visibility_id=visibility.id) }}" class="d-flex gap-2"><input class="form-control" type="text" name="display_name" value="{{ visibility.display_name }}"><button class="btn btn-sm btn-primary" type="submit">Сохранить</button></form></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="tab-pane fade" id="tab-users">
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="card p-3">
+                    <h4>Группы</h4>
+                    <form method="POST" action="{{ url_for('create_group') }}" class="d-flex gap-2 mb-3">
+                        <input type="text" class="form-control" name="name" placeholder="Новая группа" required>
+                        <button type="submit" class="btn btn-primary">Создать</button>
+                    </form>
+                    <ul class="mb-0">{% for group in groups %}<li>{{ group.name }}</li>{% else %}<li>Групп пока нет</li>{% endfor %}</ul>
+                </div>
+            </div>
+            <div class="col-lg-7">
+                <div class="card p-3">
+                    <h4>Пользователи и группы</h4>
+                    {% for user in users %}
+                        <form method="POST" action="{{ url_for('set_user_group', user_id=user.id) }}" class="d-flex gap-2 mb-2">
+                            <input class="form-control" value="{{ user.email }}" readonly>
+                            <select class="form-select" name="group_ids" multiple>{% for group in groups %}<option value="{{ group.id }}" {% if group in user.groups %}selected{% endif %}>{{ group.name }}</option>{% endfor %}</select>
+                            <button class="btn btn-outline-primary" type="submit">Группы</button>
+                        </form>
+                        {% if current_user.role in ['admin', 'superadmin'] %}
+                        <form method="POST" action="{{ url_for('set_user_group_admin_rights', user_id=user.id) }}" class="d-flex gap-2 mb-2">
+                            <input class="form-control" value="Права админа групп для {{ user.email }}" readonly>
+                            <select class="form-select" name="admin_group_ids" multiple>{% for group in groups %}<option value="{{ group.id }}" {% if group in user.admin_groups %}selected{% endif %}>{{ group.name }}</option>{% endfor %}</select>
+                            <button class="btn btn-outline-secondary" type="submit">Права</button>
+                        </form>
+                        {% endif %}
+                        <div class="d-flex gap-2 mb-3">
+                            {% if user.is_blocked %}
+                                <div class="text-danger small align-self-center">Заблокирован{% if user.blocked_until %} до {{ user.blocked_until }}{% endif %}</div>
+                                <form method="POST" action="{{ url_for('unban_user', user_id=user.id) }}"><button class="btn btn-sm btn-success" type="submit">Разблокировать</button></form>
+                            {% else %}
+                                <button class="btn btn-sm btn-warning" type="button" data-bs-toggle="collapse" data-bs-target="#ban-{{ user.id }}">Блокировать</button>
+                            {% endif %}
+                        </div>
+                        <div class="collapse mb-3" id="ban-{{ user.id }}">
+                            <form method="POST" action="{{ url_for('ban_user', user_id=user.id) }}" class="card card-body">
+                                <div class="mb-2"><input class="form-control" name="reason" placeholder="Причина блокировки"></div>
+                                <div class="mb-2"><input class="form-control" name="hours" type="number" min="1" max="8760" value="24"></div>
+                                <button class="btn btn-warning" type="submit">Подтвердить блокировку</button>
+                            </form>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="tab-moderation">
+        <h4>Новости</h4>
+        {% for post in news %}
+            <form method="POST" action="{{ url_for('edit_news', news_id=post.id) }}" class="card p-3 mb-2">
+                <input class="form-control mb-2" name="title" value="{{ post.title }}" required>
+                <textarea class="form-control mb-2" name="body" rows="3" required>{{ post.body }}</textarea>
+                <div class="small text-muted mb-2">
+                    Автор: {{ post.author.email if post.author else 'неизвестно' }}
+                    · Группа: {{ post.group.name if post.group else 'Общая' }}
+                    · {{ post.created_at }}
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-primary" type="submit">Сохранить</button>
+                    <button class="btn btn-sm btn-danger" formaction="{{ url_for('delete_news', news_id=post.id) }}" formmethod="POST" onclick="return confirm('Удалить новость?')" type="submit">Удалить</button>
+                </div>
+            </form>
+        {% else %}
+            <div class="text-muted mb-3">Новостей для модерации нет.</div>
+        {% endfor %}
+        <h4 class="mt-4">Комментарии к файлам</h4>
+        {% for comment in comments %}
+            <form method="POST" action="{{ url_for('edit_comment', comment_id=comment.id) }}" class="card p-3 mb-2">
+                <div class="small text-muted mb-2">{{ comment.user.email if comment.user else 'неизвестно' }} · файл #{{ comment.file_id }} · {{ comment.created_at }}</div>
+                <textarea class="form-control mb-2" name="content" rows="2" required>{{ comment.content }}</textarea>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-primary" type="submit">Сохранить</button>
+                    <button class="btn btn-sm btn-danger" formaction="{{ url_for('delete_comment', comment_id=comment.id) }}" formmethod="POST" onclick="return confirm('Удалить комментарий?')" type="submit">Удалить</button>
+                </div>
+            </form>
+        {% else %}
+            <div class="text-muted">Комментариев для модерации нет.</div>
+        {% endfor %}
+    </div>
+
+    <div class="tab-pane fade" id="tab-legal">
+        <div class="card p-3">
+            <h4>Редактирование legal (Markdown)</h4>
+            <form method="POST" action="{{ url_for('update_legal') }}">
+                <textarea class="form-control mb-2" rows="12" name="legal_markdown">{{ legal_raw }}</textarea>
+                <button class="btn btn-primary" type="submit">Сохранить</button>
+            </form>
         </div>
     </div>
 </div>
-<hr>
-<h4>Список файлов</h4>
-<table class="table table-hover align-middle">
-    <thead>
-        <tr>
-            <th>Системное имя</th>
-            <th>Размер (MB)</th>
-            <th>Кусков</th>
-            <th>SHA-256</th>
-            <th>Действия</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for file in files %}
-        <tr>
-            <td>{{ file.filename }}</td>
-            <td>{{ file.get_size_mb() }}</td>
-            <td>{{ file.get_piece_count() }}</td>
-            <td><code>{{ file.content_hash or '-' }}</code></td>
-            <td>
-                <form method="POST" action="{{ url_for('delete_file_admin', file_id=file.id) }}" onsubmit="return confirm('Удалить файл?');">
-                    <button type="submit" class="btn btn-sm btn-danger">Удалить</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
 {% endblock %}

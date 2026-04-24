@@ -18,6 +18,12 @@ user_groups = db.Table(
     db.Column('group_id', db.Integer, db.ForeignKey('groups.id'), primary_key=True),
 )
 
+group_admins = db.Table(
+    'group_admins',
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
+    db.Column('group_id', db.Integer, db.ForeignKey('groups.id'), primary_key=True),
+)
+
 
 class User(UserMixin, db.Model):
     """пользователи системы"""
@@ -28,18 +34,25 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     role = db.Column(db.String(20), default='user')  # admin или user
     group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=True)
+    is_blocked = db.Column(db.Boolean, default=False, nullable=False)
+    block_reason = db.Column(db.Text, nullable=True)
+    blocked_until = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # связи с другими таблицами
     files = db.relationship('File', backref='uploader', lazy=True)
     peers = db.relationship('Peer', backref='user', lazy=True)
     groups = db.relationship('Group', secondary=user_groups, back_populates='users', lazy='select')
+    admin_groups = db.relationship('Group', secondary=group_admins, back_populates='admins', lazy='select')
 
     def __repr__(self):
         return f'<User {self.email} ({self.role})>'
 
     def is_admin(self):
-        return self.role == 'admin'
+        return self.role in ('admin', 'superadmin')
+
+    def is_superadmin(self):
+        return self.role in ('admin', 'superadmin')
 
 
 class File(db.Model):
@@ -160,6 +173,7 @@ class Group(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     users = db.relationship('User', secondary=user_groups, back_populates='groups', lazy='select')
+    admins = db.relationship('User', secondary=group_admins, back_populates='admin_groups', lazy='select')
     visibilities = db.relationship('FileVisibility', backref='group', lazy=True, cascade='all, delete-orphan')
 
     def __repr__(self):
@@ -185,6 +199,33 @@ class FileVisibility(db.Model):
 
     def __repr__(self):
         return f'<FileVisibility file={self.file_id} group={self.group_id} name={self.display_name}>'
+
+
+class NewsPost(db.Model):
+    __tablename__ = 'news_posts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=True)
+    author_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    group = db.relationship('Group', lazy='joined')
+    author = db.relationship('User', lazy='joined')
+
+
+class FileComment(db.Model):
+    __tablename__ = 'file_comments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    file_id = db.Column(db.Integer, db.ForeignKey('files.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    file = db.relationship('File', lazy='joined')
+    user = db.relationship('User', lazy='joined')
 
 
 # вспомогательные функции для работы с бд

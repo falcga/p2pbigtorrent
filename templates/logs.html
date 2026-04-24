@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-3">Серверные логи</h2>
+<p class="text-muted">Показываются последние записи `instance/app.log` и `debug-bbf891.log`.</p>
+
+<div class="row g-3">
+    <div class="col-12">
+        <div class="card p-3">
+            <h4 class="h6">app.log</h4>
+            <pre style="max-height: 420px; overflow: auto; white-space: pre-wrap;">{% for line in app_log %}{{ line }}
+{% endfor %}</pre>
+        </div>
+    </div>
+    <div class="col-12">
+        <div class="card p-3">
+            <h4 class="h6">debug-bbf891.log</h4>
+            <pre style="max-height: 420px; overflow: auto; white-space: pre-wrap;">{% for line in debug_log %}{{ line }}
+{% endfor %}</pre>
+        </div>
+    </div>
+</div>
+{% endblock %}

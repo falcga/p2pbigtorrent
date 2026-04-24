@@ -13,7 +13,7 @@ signaling_queue = {}
 
 
 def _can_access_file(file_id):
-    if current_user.role == 'admin':
+    if current_user.role in ('admin', 'superadmin'):
         return True
     user_group_ids = [group.id for group in getattr(current_user, 'groups', [])]
     return FileVisibility.query.filter(

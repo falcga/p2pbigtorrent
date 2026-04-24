@@ -236,7 +236,7 @@ def get_file_piece_hashes(file_id: int) -> Optional[List[str]]:
     вход: id файла
     выход: список hex строк или None
     """
-    File, _, _ = _get_models()
+    File, _, _, _ = _get_models()
     db = _get_db()
 
     file_record = db.session.get(File, file_id)
@@ -327,7 +327,7 @@ def is_server_peer_registered(file_id: int) -> bool:
     """
     проверка есть ли серверный пир для файла
     """
-    _, Peer, _ = _get_models()
+    _, Peer, _, _ = _get_models()
     db = _get_db()
 
     server_peer = Peer.query.filter_by(
@@ -348,7 +348,7 @@ def register_server_peer(file_id: int, db=None) -> bool:
     if db is None:
         db = _get_db()
 
-    _, Peer, Piece = _get_models()
+    _, Peer, Piece, _ = _get_models()
 
     if is_server_peer_registered(file_id):
         return True

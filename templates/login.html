@@ -2,6 +2,13 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
+        <div class="card p-4 mb-3">
+            <h2 class="h5">О проекте</h2>
+            <p class="mb-0">
+                Secure P2P Distributor ускоряет распространение больших файлов внутри сети:
+                после загрузки пользователем файл может раздаваться другим участникам.
+            </p>
+        </div>
         <div class="card p-4">
             <h2 class="h4 mb-3">Вход в систему</h2>
             <form method="POST">
@@ -16,6 +23,18 @@
                 <button type="submit" class="btn btn-primary">Войти</button>
                 <a href="{{ url_for('auth.register') }}" class="btn btn-link">Регистрация</a>
             </form>
+        </div>
+        <div class="card p-4 mt-3">
+            <h3 class="h5">Общие новости</h3>
+            {% for post in public_news %}
+                <div class="border rounded p-2 mb-2">
+                    <div class="fw-semibold">{{ post.title }}</div>
+                    <div>{{ post.body_html }}</div>
+                    <small class="text-muted">{{ post.created_at }}</small>
+                </div>
+            {% else %}
+                <div class="text-muted">Новостей пока нет.</div>
+            {% endfor %}
         </div>
     </div>
 </div>

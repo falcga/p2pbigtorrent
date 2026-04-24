@@ -3,10 +3,47 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="mb-0">Доступные файлы</h2>
 </div>
+
+<div class="card p-3 mb-4">
+    <h4>Новостная лента</h4>
+    {% if can_open_admin %}
+    <form method="POST" action="{{ url_for('create_news') }}" class="mb-3">
+        <div class="mb-2">
+            <input class="form-control" name="title" placeholder="Заголовок новости" required>
+        </div>
+        <div class="mb-2">
+            <textarea class="form-control" name="body" rows="2" placeholder="Текст новости" required></textarea>
+        </div>
+        <div class="mb-2">
+            <select class="form-select" name="group_id">
+                <option value="">Общая новость</option>
+                {% for group in publish_groups %}
+                <option value="{{ group.id }}">{{ group.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="btn btn-primary" type="submit">Опубликовать</button>
+    </form>
+    {% endif %}
+    {% for post in news %}
+        <div class="border rounded p-2 mb-2">
+            <div class="d-flex justify-content-between">
+                <strong>{{ post.title }}</strong>
+                <small>{{ post.group.name if post.group else 'Общая' }}</small>
+            </div>
+            <div>{{ post.body_html }}</div>
+            <small class="text-muted">{{ post.author.email }} · {{ post.created_at }}</small>
+        </div>
+    {% else %}
+        <div class="text-muted">Новостей пока нет.</div>
+    {% endfor %}
+</div>
+
 <table class="table table-hover align-middle">
     <thead>
         <tr>
             <th>Имя файла</th>
+            <th>Группа</th>
             <th>Размер</th>
             <th>Действие</th>
         </tr>
@@ -15,6 +52,7 @@
         {% for file in files %}
         <tr id="file-row-{{ file.id }}">
             <td>{{ file.display_name or file.filename }}</td>
+            <td><span class="text-secondary">{{ file.group.name if file.group else 'Общий' }}</span></td>
             <td>{{ (file.file_size / (1024*1024))|round(2) }} MB</td>
             <td>
                 <button class="btn btn-primary download-btn" data-file-id="{{ file.id }}"
@@ -26,11 +64,21 @@
                         data-piece-hashes='{{ file.get_piece_hashes_list()|tojson }}'>
                     Скачать
                 </button>
+                <button class="btn btn-outline-secondary pause-btn ms-2" style="display:none;" type="button">Пауза</button>
                 <div class="progress mt-2" style="display:none; height: 20px;">
                     <div class="progress-bar" role="progressbar" style="width: 0%;">0%</div>
                 </div>
                 <div class="small mt-2 checksum-status text-muted"></div>
                 <a class="btn btn-sm btn-success download-link" style="display:none;">Сохранить файл</a>
+                <div class="mt-2">
+                    <form method="POST" action="{{ url_for('add_file_comment', file_id=file.id) }}" class="d-flex gap-2 mb-2">
+                        <input class="form-control form-control-sm" name="content" placeholder="Комментарий к файлу">
+                        <button class="btn btn-sm btn-outline-primary" type="submit">Отправить</button>
+                    </form>
+                    {% for comment in comments.get(file.id, [])[:3] %}
+                    <div class="small"><strong>{{ comment.user.email }}:</strong> {{ comment.content }}</div>
+                    {% endfor %}
+                </div>
             </td>
         </tr>
         {% endfor %}

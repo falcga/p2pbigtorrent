@@ -27,9 +27,12 @@ document.addEventListener('DOMContentLoaded', function () {
             const downloadLink = row.querySelector('.download-link');
             const checksumStatus = row.querySelector('.checksum-status');
             const downloadBtn = this;
+            const pauseBtn = row.querySelector('.pause-btn');
 
             downloadBtn.disabled = true;
             progressDiv.style.display = 'block';
+            pauseBtn.style.display = 'inline-block';
+            pauseBtn.textContent = 'Пауза';
 
             const downloader = client.startDownload(fileInfo, {
                 onProgress: (percent, downloaded, total) => {
@@ -50,6 +53,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         checksumStatus.className = `small mt-2 checksum-status ${ok ? 'text-success' : 'text-danger'}`;
                     }
                     downloadBtn.disabled = false;
+                    pauseBtn.style.display = 'none';
                 },
                 onPeerConnected: (peerId) => {
                     console.log('Peer connected:', peerId);
@@ -58,6 +62,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     console.log('Peer disconnected:', peerId);
                 }
             });
+
+            pauseBtn.onclick = function () {
+                if (downloader.isPaused) {
+                    downloader.resume();
+                    pauseBtn.textContent = 'Пауза';
+                } else {
+                    downloader.pause();
+                    pauseBtn.textContent = 'Продолжить';
+                }
+            };
         });
     });
 });

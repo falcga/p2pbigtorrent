@@ -1,4 +1,8 @@
+markupsafe
+sqlalchemy
 Flask
 Flask-Login
 Flask-SQLAlchemy
 python-dotenv
+Markdown
+markdown

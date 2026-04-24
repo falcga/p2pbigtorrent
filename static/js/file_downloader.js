@@ -15,6 +15,7 @@ class FileDownloader {
         this.isComplete = false;
         this.fileBlob = null;
         this.finalHashHex = null;
+        this.isPaused = false;
 
         // Очередь запросов
         this.pieceQueue = [];
@@ -39,6 +40,7 @@ class FileDownloader {
     // Запуск загрузки: запрос к трекеру и установка соединений
     async start() {
         this.stats.startTime = Date.now();
+        this.isPaused = false;
         const announce = await this._announceAndConnect();
         if (this.peers.size === 0 || announce.server_available) {
             await this._downloadFromServer();
@@ -51,6 +53,19 @@ class FileDownloader {
             }
         }, 3500);
         this._requestNextPieces();
+    }
+
+    pause() {
+        this.isPaused = true;
+    }
+
+    resume() {
+        if (!this.isPaused || this.isComplete) {
+            return;
+        }
+        this.isPaused = false;
+        this._requestNextPieces();
+        this._downloadFromServer();
     }
 
     async _announceAndConnect() {
@@ -206,7 +221,7 @@ class FileDownloader {
 
     // Запросить следующий кусок у любого доступного пира
     _requestNextPieces() {
-        if (this.isComplete) return;
+        if (this.isComplete || this.isPaused) return;
         if (this.pieceQueue.length === 0) {
             // Проверить, всё ли скачано
             if (this.downloadedPieces === this.fileInfo.piece_count) {
@@ -340,7 +355,7 @@ class FileDownloader {
     }
 
     async _downloadFromServer() {
-        while (this.pieceQueue.length > 0 && !this.isComplete) {
+        while (this.pieceQueue.length > 0 && !this.isComplete && !this.isPaused) {
             const pieceIndex = this.pieceQueue.shift();
             try {
                 const resp = await fetch(
